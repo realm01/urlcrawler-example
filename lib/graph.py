@@ -1,7 +1,7 @@
 import networkx as nx
 from urllib.parse import urlsplit
 
-class Graph(nx.Graph):
+class Graph(nx.DiGraph):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__internal_nodelist = dict()
@@ -13,7 +13,7 @@ class Graph(nx.Graph):
         def __internal_add_node(resp):
             host = self.__get_hostname(resp.url)
             if not self.has_node(host):
-                nx.Graph.add_node(self, host, attr_dict, **attr)
+                nx.DiGraph.add_node(self, host)
                 self.__internal_nodelist[host] = resp
 
         if n.history:
@@ -28,3 +28,7 @@ class Graph(nx.Graph):
                 last_resp = resp
         else:
             __internal_add_node(n)
+
+    @property
+    def get_respones(self):
+        return self.__internal_nodelist
