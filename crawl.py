@@ -8,8 +8,11 @@ def main():
     urls = read_config('urls.conf')
     graph = Graph()
 
+    max_recursion = 4
+    max_threads = 20
+
     for url in urls:
-        graph.add_node(requests.get(url))
+        graph.start_crawl(requests.get(url))
 
     visualize_graph(graph, "test.png")
 
