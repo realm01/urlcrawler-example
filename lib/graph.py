@@ -17,12 +17,15 @@ class Graph(nx.DiGraph):
                 self.__internal_nodelist[host] = resp
 
         if n.history:
-            last_resp = n
+            last_resp = None
             for resp in n.history:
                 host = self.__get_hostname(resp.url)
                 __internal_add_node(resp)
-                self.add_edge(host, self.__get_hostname(last_resp.url))
+                if last_resp is not None:
+                    self.add_edge(self.__get_hostname(last_resp.url), host)
                 last_resp = resp
+
+            self.add_edge(self.__get_hostname(last_resp.url), self.__get_hostname(n.url))
         else:
             __internal_add_node(n)
 
