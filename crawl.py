@@ -1,21 +1,23 @@
 import requests
-from lib.utils import read_config
+from lib.utils import read_config, ThreadInformation, RecursionInformation
 from lib.graph import Graph
 from lib.visualize import visualize_graph
 
 
 def main():
     urls = read_config('urls.conf')
-    graph = Graph()
 
-    max_recursion = 4
-    max_threads = 20
+    thread_information = ThreadInformation(100)
+    rescursion_information = RecursionInformation(4)
+    graph = Graph(thread_information, rescursion_information)
 
     for url in urls:
         graph.start_crawl(requests.get(url))
 
     visualize_graph(graph, "test.png")
-
+    print('-------------')
+    print(len(graph.internal_nodelist.keys()))
+    print(graph.internal_nodelist.keys())
 
 if __name__ == '__main__':
     main()
