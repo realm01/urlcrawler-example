@@ -22,20 +22,20 @@ class CrawlThread(Thread):
         self.__recursion_information = rescursion_information
         self.__link_node = link_node
         self.__thread_pool = list()
+        self.__thread_pool_link_evaluation = list()
         self.__is_joining = False
 
-    def join_threads(self):
+    def join_threads(self, thread_pool):
         if self.__is_joining:
             return
 
         self.__is_joining = True
         # print('JOINING THREADS', self.__global_thread_information.thread_count)
-        for t in self.__thread_pool:
+        for t in thread_pool:
             t.join()
             self.__global_thread_information.thread_count.decrement()
-            print('COUTCOUTCOUT', self.__global_thread_information.thread_count)
 
-        self.__thread_pool = list()
+        del(thread_pool[:])
 
         self.__is_joining = False
 
@@ -45,34 +45,47 @@ class CrawlThread(Thread):
         soup = BeautifulSoup(resp.text, 'html.parser')
         links = soup.find_all('a')
 
-        print(len(links))
-
         for link in links:
-            if self.__recursion_information.allow_new_recursion():
-                new_url = link.get('href')
-                new_host = URLHelpers.get_hostname(new_url)
-                if new_url is not None and isinstance(new_url, str) and new_url.find('http://') == -1 and new_url.find('https://') == -1:
-                    continue
+            def __link_thread():
+                if self.__recursion_information.allow_new_recursion():
+                    new_url = link.get('href')
+                    new_host = URLHelpers.get_hostname(new_url)
+                    if new_url is not None and isinstance(new_url, str) and new_url.find('http://') == -1 and new_url.find('https://') == -1:
+                        return
 
-                if new_host in self.__graph.internal_nodelist.keys():
-                    continue
+                    if new_host in self.__graph.internal_nodelist.keys():
+                        return
 
-                try:
-                    new_resp = requests.get(new_url)
-                except:
-                    continue
+                    try:
+                        new_resp = requests.get(new_url)
+                    except:
+                        return
 
-                if not self.__global_thread_information.allow_new_thread():
-                    print('NOT ALLOWING NEW THREAD')
-                    self.join_threads()
+                    def __start_crawl_thread():
+                        self.__global_thread_information.thread_count.increment()
+                        thread = CrawlThread(self.__graph, new_resp, self.__global_thread_information, self.__recursion_information.copy(), resp_url)
+                        thread.start()
+                        self.__thread_pool.append(thread)
 
-                if self.__global_thread_information.allow_new_thread():
-                    self.__global_thread_information.thread_count.increment()
-                    thread = CrawlThread(self.__graph, new_resp, self.__global_thread_information, self.__recursion_information.copy(), resp_url)
-                    thread.start()
-                    self.__thread_pool.append(thread)
+                    if not self.__global_thread_information.allow_new_thread():
+                        self.join_threads(self.__thread_pool)
+                        __start_crawl_thread()
+                    else:
+                        __start_crawl_thread()
 
-        self.join_threads()
+            def __start_link_evaluation_thread():
+                t = Thread(target=__link_thread)
+                self.__thread_pool.append(t)
+                t.start()
+
+            if not self.__global_thread_information.allow_new_thread():
+                self.join_threads(self.__thread_pool_link_evaluation)
+                __start_link_evaluation_thread()
+            else:
+                __start_link_evaluation_thread()
+
+        self.join_threads(self.__thread_pool)
+        self.join_threads(self.__thread_pool_link_evaluation)
 
     def run(self):
         def __internal_add_node(resp):
