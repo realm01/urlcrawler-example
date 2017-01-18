@@ -8,7 +8,7 @@ def main():
     urls = read_config('urls.conf')
 
     thread_information = ThreadInformation(200)
-    rescursion_information = RecursionInformation(5)
+    rescursion_information = RecursionInformation(4)
     graph = Graph(thread_information, rescursion_information)
 
     for url in urls:

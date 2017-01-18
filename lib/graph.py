@@ -10,7 +10,14 @@ class URLHelpers():
     @classmethod
     def get_hostname(cls, url):
         # return "{0.scheme}://{0.netloc}/".format(urlsplit(url))
-        return url
+        if URLHelpers.is_string(url):
+            return url.strip()
+        else:
+            return url
+
+    @classmethod
+    def is_string(cls, url):
+        return url is not None and isinstance(url, str) and url.find('http://') == -1 and url.find('https://') == -1
 
 
 class CrawlThread(Thread):
@@ -49,7 +56,7 @@ class CrawlThread(Thread):
                 if self.__recursion_information.allow_new_recursion():
                     new_url = link.get('href')
                     new_host = URLHelpers.get_hostname(new_url)
-                    if new_url is not None and isinstance(new_url, str) and new_url.find('http://') == -1 and new_url.find('https://') == -1:
+                    if URLHelpers.is_string(new_url):
                         return
 
                     if new_host in self.__graph.internal_nodelist.keys():
@@ -93,23 +100,34 @@ class CrawlThread(Thread):
             self.__graph.internal_nodelist[host] = resp
             print(host)
 
+        def __internal_add_edge(n1, n2):
+            if self.__graph.call_method('has_edge', n1, n2):
+                return False
+
+            self.__graph.call_method('add_edge', n1, n2)
+            return True
+
         if self.__curr_resp.history:
             if self.__link_node is not None:
-                self.__graph.call_method('add_edge', self.__link_node, URLHelpers.get_hostname(self.__curr_resp.history[-1].url))
+                if not __internal_add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.history[-1].url)):
+                    return
 
             last_resp = None
             for resp in self.__curr_resp.history:
                 host = URLHelpers.get_hostname(resp.url)
                 __internal_add_node(resp)
                 if last_resp is not None:
-                    self.__graph.call_method('add_edge', URLHelpers.get_hostname(last_resp.url), host)
+                    if not __internal_add_edge(URLHelpers.get_hostname(last_resp.url), host):
+                        return
                 last_resp = resp
 
             __internal_add_node(self.__curr_resp)
-            self.__graph.call_method('add_edge', URLHelpers.get_hostname(last_resp.url), URLHelpers.get_hostname(self.__curr_resp.url))
+            if not __internal_add_edge(URLHelpers.get_hostname(last_resp.url), URLHelpers.get_hostname(self.__curr_resp.url)):
+                return
         else:
             if self.__link_node is not None:
-                self.__graph.call_method('add_edge', self.__link_node, URLHelpers.get_hostname(self.__curr_resp.url))
+                if not __internal_add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.url)):
+                    return
 
             __internal_add_node(self.__curr_resp)
 
