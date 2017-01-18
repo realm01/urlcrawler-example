@@ -30,7 +30,6 @@ class CrawlThread(Thread):
             return
 
         self.__is_joining = True
-        # print('JOINING THREADS', self.__global_thread_information.thread_count)
         for t in thread_pool:
             t.join()
             self.__global_thread_information.thread_count.decrement()
