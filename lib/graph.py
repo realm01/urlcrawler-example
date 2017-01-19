@@ -1,9 +1,10 @@
 import networkx as nx
 from urllib.parse import urlsplit
-from lib.utils import ThreadInformation
+from lib.utils import ThreadInformation, RecursionInformation
 from threading import Thread, Lock
 from bs4 import BeautifulSoup
 import requests
+import pickle
 
 
 class URLHelpers():
@@ -167,3 +168,20 @@ class Graph(nx.DiGraph):
         r = getattr(self, method_name)(*args, **kwargs)
         self.__mutex.release()
         return r
+
+    def serialize(self, file):
+        with open(file, 'wb') as f:
+            pickle.dump((self.nodes(), self.edges(), self.__global_thread_information.max_threads, self.__recursion_information.max_recursion), f)
+
+    @classmethod
+    def deserialize(cls, file):
+        with open(file, 'rb') as f:
+            ps = pickle.load(f)
+
+        gti = ThreadInformation(ps[2])
+        ri = RecursionInformation(ps[3])
+        obj = Graph(gti, ri)
+        obj.add_nodes_from(ps[0])
+        obj.add_edges_from(ps[1])
+
+        return obj
