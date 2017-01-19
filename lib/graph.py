@@ -59,7 +59,7 @@ class CrawlThread(Thread):
                     if URLHelpers.is_string(new_url):
                         return
 
-                    if new_host in self.__graph.internal_nodelist.keys():
+                    if self.__graph.has_node(new_url):
                         return
 
                     try:
@@ -96,37 +96,29 @@ class CrawlThread(Thread):
     def run(self):
         def __internal_add_node(resp):
             host = URLHelpers.get_hostname(resp.url)
-            self.__graph.call_method('add_node', host)
-            self.__graph.internal_nodelist[host] = resp
-            print(host)
-
-        def __internal_add_edge(n1, n2):
-            if self.__graph.call_method('has_edge', n1, n2):
-                return False
-
-            self.__graph.call_method('add_edge', n1, n2)
-            return True
+            self.__graph.add_node(host)
 
         if self.__curr_resp.history:
-            if self.__link_node is not None:
-                if not __internal_add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.history[-1].url)):
-                    return
-
             last_resp = None
             for resp in self.__curr_resp.history:
                 host = URLHelpers.get_hostname(resp.url)
                 __internal_add_node(resp)
                 if last_resp is not None:
-                    if not __internal_add_edge(URLHelpers.get_hostname(last_resp.url), host):
+                    if not self.__graph.add_edge(URLHelpers.get_hostname(last_resp.url), host):
                         return
                 last_resp = resp
 
             __internal_add_node(self.__curr_resp)
-            if not __internal_add_edge(URLHelpers.get_hostname(last_resp.url), URLHelpers.get_hostname(self.__curr_resp.url)):
+
+            if self.__link_node is not None:
+                if not self.__graph.add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.history[-1].url)):
+                    return
+
+            if not self.__graph.add_edge(URLHelpers.get_hostname(last_resp.url), URLHelpers.get_hostname(self.__curr_resp.url)):
                 return
         else:
             if self.__link_node is not None:
-                if not __internal_add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.url)):
+                if not self.__graph.add_edge(self.__link_node, URLHelpers.get_hostname(self.__curr_resp.url)):
                     return
 
             __internal_add_node(self.__curr_resp)
@@ -137,7 +129,6 @@ class CrawlThread(Thread):
 class Graph(nx.DiGraph):
     def __init__(self, thread_information, rescursion_information, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.internal_nodelist = dict()
         self.__mutex = Lock()
         self.__global_thread_information = thread_information
         self.__recursion_information = rescursion_information
@@ -153,12 +144,26 @@ class Graph(nx.DiGraph):
             thread = CrawlThread(self, resp, self.__global_thread_information, self.__recursion_information)
             thread.run()
 
+    def add_node(self, n, *args, **kwargs):
+        with self.__mutex:
+            if nx.DiGraph.has_node(self, n):
+                return False
+            else:
+                nx.DiGraph.add_node(self, n, *args, **kwargs)
+                print(n)
+                return True
+
+    def add_edge(self, n1, n2, *args, **kwargs):
+        with self.__mutex:
+            if nx.DiGraph.has_edge(self, n1, n2):
+                return False
+            else:
+                nx.DiGraph.add_edge(self, n1, n2, *args, **kwargs)
+                return True
+
     def call_method(self, method_name, *args, **kwargs):
+        """Call a method in Graph thread safe using reflection, not used atm."""
         self.__mutex.acquire()
         r = getattr(self, method_name)(*args, **kwargs)
         self.__mutex.release()
         return r
-
-    @property
-    def get_respones(self):
-        return self.__internal_nodelist
